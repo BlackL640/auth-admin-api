@@ -39,9 +39,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            if [ ! -d "~/auth-admin-api" ]; then
-              git clone https://github.com/BlackL640/auth-admin-api.git ~/auth-admin-api
+            if [ ! -d "/home/ubuntu/auth-admin-api" ]; then
+              git clone https://github.com/BlackL640/auth-admin-api.git /home/ubuntu/auth-admin-api
             fi
-            cd ~/auth-admin-api
+            cd /home/ubuntu/auth-admin-api
             git pull origin main
             docker compose up -d --build || docker-compose up -d --build
