@@ -1,0 +1,7 @@
+services:
+  auth-admin-api:
+    build: .
+    container_name: auth_admin_api
+    ports:
+      - "8001:8000"  # <--- Changed host port from 8000 to 8001
+    restart: always
