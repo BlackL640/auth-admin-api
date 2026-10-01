@@ -1,7 +1,17 @@
+
 services:
   auth-admin-api:
     build: .
     container_name: auth_admin_api
     ports:
-      - "8001:8000"  # <--- Changed host port from 8000 to 8001
+      - "8001:8000"  # API accessible on host port 8001
+    restart: always
+
+  auth-admin-frontend:
+    build: ./frontend
+    container_name: auth_admin_frontend
+    ports:
+      - "3000:80"    # React UI accessible on host port 3000
+    depends_on:
+      - auth-admin-api
     restart: always
