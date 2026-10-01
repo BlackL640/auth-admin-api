@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -11,6 +12,24 @@ app = FastAPI(
     version="1.0.0",
     description="Dedicated microservice for User Authentication and Admin Operations"
 )
+
+# --- CORS Configuration ---
+origins = [
+    "http://localhost:3000",       # Local React/Vite development
+    "http://localhost:5173",       # Vite default dev server
+    "http://127.0.0.1:3000",
+    "http://92.4.155.111:3000",    # Production React frontend on OCI
+    "*"                            # Fallback for API client flexibility
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # --- Pydantic Schemas ---
 class DietitianRegister(BaseModel):
