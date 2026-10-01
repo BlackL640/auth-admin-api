@@ -2,115 +2,240 @@ import React, { useState, useEffect } from 'react';
 import api from './api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('login');
-  const [status, setStatus] = useState('Checking...');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('health');
+  const [healthStatus, setHealthStatus] = useState(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
 
-  // Login state
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  // Form states
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [dietitianData, setDietitianData] = useState({ first_name: '', last_name: '', email: '', password: '', qualification: '' });
+  const [clientData, setClientData] = useState({ first_name: '', last_name: '', email: '', password: '', gender: '' });
+  
+  // New States for Missing Features
+  const [branches, setBranches] = useState([]);
+  const [branchForm, setBranchForm] = useState({ name: '', location: '' });
+  const [approvals, setApprovals] = useState([]);
 
-  // Dietitian registration state
-  const [dietitianForm, setDietitianForm] = useState({
-    first_name: '', last_name: '', email: '', password: '', qualification: ''
-  });
-
-  // Client registration state
-  const [clientForm, setClientForm] = useState({
-    first_name: '', last_name: '', email: '', password: '', gender: 'Male'
-  });
-
+  // Check health on load
   useEffect(() => {
-    api.get('/health')
-      .then(res => setStatus(`${res.data.service} - ${res.data.status}`))
-      .catch(() => setStatus('Backend Offline'));
+    checkHealth();
   }, []);
+
+  // Save/Remove token from localStorage
+  const handleSetToken = (newToken) => {
+    setToken(newToken);
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    } else {
+      localStorage.removeItem('token');
+    }
+  };
+
+  const checkHealth = async () => {
+    try {
+      const res = await api.get('/health');
+      setHealthStatus(res.data);
+    } catch (err) {
+      setHealthStatus({ status: 'Error connecting to API' });
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setMessage(''); setError('');
     try {
-      const res = await api.post('/login', loginForm);
-      setMessage(`Login successful! Token: ${res.data.token}`);
+      const res = await api.post('/login', loginData);
+      const authToken = res.data.access_token || res.data.token || 'logged-in';
+      handleSetToken(authToken);
+      setMessage({ type: 'success', text: 'Login successful!' });
     } catch (err) {
-      setError('Login failed');
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Login failed' });
     }
   };
 
-  const handleDietitianRegister = async (e) => {
+  const handleRegisterDietitian = async (e) => {
     e.preventDefault();
-    setMessage(''); setError('');
     try {
-      const res = await api.post('/register/dietitian', dietitianForm);
-      setMessage(res.data.message);
+      await api.post('/register/dietitian', dietitianData);
+      setMessage({ type: 'success', text: 'Dietitian registered successfully!' });
     } catch (err) {
-      setError('Dietitian registration failed');
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Registration failed' });
     }
   };
 
-  const handleClientRegister = async (e) => {
+  const handleRegisterClient = async (e) => {
     e.preventDefault();
-    setMessage(''); setError('');
     try {
-      const res = await api.post('/register/client', clientForm);
-      setMessage(res.data.message);
+      await api.post('/register/client', clientData);
+      setMessage({ type: 'success', text: 'Client registered successfully!' });
     } catch (err) {
-      setError('Client registration failed');
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Registration failed' });
+    }
+  };
+
+  // Branch Handlers
+  const fetchBranches = async () => {
+    try {
+      const res = await api.get('/branches');
+      setBranches(res.data);
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to fetch branches' });
+    }
+  };
+
+  const handleCreateBranch = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/branches', branchForm);
+      setMessage({ type: 'success', text: 'Branch created successfully!' });
+      setBranchForm({ name: '', location: '' });
+      fetchBranches();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to create branch' });
+    }
+  };
+
+  // Admin Approvals Handlers
+  const fetchApprovals = async () => {
+    try {
+      const res = await api.get('/admin/approvals');
+      setApprovals(res.data);
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to fetch admin approvals' });
+    }
+  };
+
+  const handleProcessApproval = async (id, status) => {
+    try {
+      await api.post('/admin/approvals', { approval_id: id, status });
+      setMessage({ type: 'success', text: `Approval set to ${status}` });
+      fetchApprovals();
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to process approval' });
     }
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '40px auto', padding: '20px', background: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-      <h2 style={{ textAlign: 'center', color: '#2c3e50' }}>Auth & Admin Management</h2>
-      <p style={{ fontSize: '12px', textAlign: 'center', background: '#eef2f7', padding: '8px', borderRadius: '4px' }}>
-        <strong>System Status:</strong> {status}
-      </p>
+    <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto' }}>
+      <h1>Dietitian App - Auth & Admin Portal</h1>
 
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #ccc' }}>
-        <button onClick={() => { setActiveTab('login'); setMessage(''); setError(''); }} style={{ padding: '10px', flex: 1, border: 'none', background: activeTab === 'login' ? '#007bff' : '#eee', color: activeTab === 'login' ? '#fff' : '#000', cursor: 'pointer' }}>Login</button>
-        <button onClick={() => { setActiveTab('dietitian'); setMessage(''); setError(''); }} style={{ padding: '10px', flex: 1, border: 'none', background: activeTab === 'dietitian' ? '#007bff' : '#eee', color: activeTab === 'dietitian' ? '#fff' : '#000', cursor: 'pointer' }}>Register Dietitian</button>
-        <button onClick={() => { setActiveTab('client'); setMessage(''); setError(''); }} style={{ padding: '10px', flex: 1, border: 'none', background: activeTab === 'client' ? '#007bff' : '#eee', color: activeTab === 'client' ? '#fff' : '#000', cursor: 'pointer' }}>Register Client</button>
+      {/* System Health Banner */}
+      <div style={{ background: '#f0f0f0', padding: '1rem', borderRadius: '5px', marginBottom: '1rem' }}>
+        <strong>System Status:</strong> {healthStatus ? JSON.stringify(healthStatus) : 'Checking...'}
+        {token && (
+          <button 
+            onClick={() => handleSetToken('')} 
+            style={{ float: 'right', background: '#dc3545', color: '#fff', border: 'none', padding: '0.3rem 0.6rem', borderRadius: '3px', cursor: 'pointer' }}
+          >
+            Logout
+          </button>
+        )}
       </div>
 
-      {message && <div style={{ color: 'green', padding: '10px', background: '#e6ffe6', marginBottom: '10px', borderRadius: '4px' }}>{message}</div>}
-      {error && <div style={{ color: 'red', padding: '10px', background: '#ffe6e6', marginBottom: '10px', borderRadius: '4px' }}>{error}</div>}
+      {/* Notification Message */}
+      {message.text && (
+        <div style={{ 
+          padding: '0.8rem', 
+          marginBottom: '1rem', 
+          borderRadius: '4px',
+          backgroundColor: message.type === 'error' ? '#f8d7da' : '#d4edda',
+          color: message.type === 'error' ? '#721c24' : '#155724'
+        }}>
+          {message.text}
+        </div>
+      )}
 
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {['login', 'register-dietitian', 'register-client', 'branches', 'admin-approvals'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => {
+              setActiveTab(tab);
+              setMessage({ type: '', text: '' });
+              if (tab === 'branches') fetchBranches();
+              if (tab === 'admin-approvals') fetchApprovals();
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              cursor: 'pointer',
+              backgroundColor: activeTab === tab ? '#007bff' : '#e0e0e0',
+              color: activeTab === tab ? '#fff' : '#000',
+              border: 'none',
+              borderRadius: '4px',
+              textTransform: 'capitalize'
+            }}
+          >
+            {tab.replace('-', ' ')}
+          </button>
+        ))}
+      </div>
+
+      {/* Form Views */}
       {activeTab === 'login' && (
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input type="email" placeholder="Email" value={loginForm.email} onChange={e => setLoginForm({...loginForm, email: e.target.value})} required style={inputStyle} />
-          <input type="password" placeholder="Password" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} required style={inputStyle} />
-          <button type="submit" style={btnStyle}>Login</button>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <h2>Login</h2>
+          <input type="email" placeholder="Email" value={loginData.email} onChange={(e) => setLoginData({...loginData, email: e.target.value})} required />
+          <input type="password" placeholder="Password" value={loginData.password} onChange={(e) => setLoginData({...loginData, password: e.target.value})} required />
+          <button type="submit">Login</button>
         </form>
       )}
 
-      {activeTab === 'dietitian' && (
-        <form onSubmit={handleDietitianRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input placeholder="First Name" value={dietitianForm.first_name} onChange={e => setDietitianForm({...dietitianForm, first_name: e.target.value})} required style={inputStyle} />
-          <input placeholder="Last Name" value={dietitianForm.last_name} onChange={e => setDietitianForm({...dietitianForm, last_name: e.target.value})} required style={inputStyle} />
-          <input type="email" placeholder="Email" value={dietitianForm.email} onChange={e => setDietitianForm({...dietitianForm, email: e.target.value})} required style={inputStyle} />
-          <input type="password" placeholder="Password" value={dietitianForm.password} onChange={e => setDietitianForm({...dietitianForm, password: e.target.value})} required style={inputStyle} />
-          <input placeholder="Qualification" value={dietitianForm.qualification} onChange={e => setDietitianForm({...dietitianForm, qualification: e.target.value})} required style={inputStyle} />
-          <button type="submit" style={btnStyle}>Register Dietitian</button>
+      {activeTab === 'register-dietitian' && (
+        <form onSubmit={handleRegisterDietitian} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <h2>Register Dietitian</h2>
+          <input type="text" placeholder="First Name" value={dietitianData.first_name} onChange={(e) => setDietitianData({...dietitianData, first_name: e.target.value})} required />
+          <input type="text" placeholder="Last Name" value={dietitianData.last_name} onChange={(e) => setDietitianData({...dietitianData, last_name: e.target.value})} required />
+          <input type="email" placeholder="Email" value={dietitianData.email} onChange={(e) => setDietitianData({...dietitianData, email: e.target.value})} required />
+          <input type="password" placeholder="Password" value={dietitianData.password} onChange={(e) => setDietitianData({...dietitianData, password: e.target.value})} required />
+          <input type="text" placeholder="Qualification" value={dietitianData.qualification} onChange={(e) => setDietitianData({...dietitianData, qualification: e.target.value})} required />
+          <button type="submit">Register Dietitian</button>
         </form>
       )}
 
-      {activeTab === 'client' && (
-        <form onSubmit={handleClientRegister} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input placeholder="First Name" value={clientForm.first_name} onChange={e => setClientForm({...clientForm, first_name: e.target.value})} required style={inputStyle} />
-          <input placeholder="Last Name" value={clientForm.last_name} onChange={e => setClientForm({...clientForm, last_name: e.target.value})} required style={inputStyle} />
-          <input type="email" placeholder="Email" value={clientForm.email} onChange={e => setClientForm({...clientForm, email: e.target.value})} required style={inputStyle} />
-          <input type="password" placeholder="Password" value={clientForm.password} onChange={e => setClientForm({...clientForm, password: e.target.value})} required style={inputStyle} />
-          <select value={clientForm.gender} onChange={e => setClientForm({...clientForm, gender: e.target.value})} style={inputStyle}>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-          <button type="submit" style={btnStyle}>Register Client</button>
+      {activeTab === 'register-client' && (
+        <form onSubmit={handleRegisterClient} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+          <h2>Register Client</h2>
+          <input type="text" placeholder="First Name" value={clientData.first_name} onChange={(e) => setClientData({...clientData, first_name: e.target.value})} required />
+          <input type="text" placeholder="Last Name" value={clientData.last_name} onChange={(e) => setClientData({...clientData, last_name: e.target.value})} required />
+          <input type="email" placeholder="Email" value={clientData.email} onChange={(e) => setClientData({...clientData, email: e.target.value})} required />
+          <input type="password" placeholder="Password" value={clientData.password} onChange={(e) => setClientData({...clientData, password: e.target.value})} required />
+          <input type="text" placeholder="Gender" value={clientData.gender} onChange={(e) => setClientData({...clientData, gender: e.target.value})} required />
+          <button type="submit">Register Client</button>
         </form>
+      )}
+
+      {activeTab === 'branches' && (
+        <div>
+          <h2>Branches</h2>
+          <form onSubmit={handleCreateBranch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+            <input type="text" placeholder="Branch Name" value={branchForm.name} onChange={(e) => setBranchForm({...branchForm, name: e.target.value})} required />
+            <input type="text" placeholder="Location" value={branchForm.location} onChange={(e) => setBranchForm({...branchForm, location: e.target.value})} required />
+            <button type="submit">Add Branch</button>
+          </form>
+          <ul>
+            {Array.isArray(branches) && branches.map((b, i) => (
+              <li key={i}>{b.name || b.branch_name} - {b.location}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {activeTab === 'admin-approvals' && (
+        <div>
+          <h2>Admin Approvals</h2>
+          <button onClick={fetchApprovals} style={{ marginBottom: '1rem' }}>Refresh List</button>
+          <ul>
+            {Array.isArray(approvals) && approvals.map((app, i) => (
+              <li key={i} style={{ marginBottom: '0.5rem' }}>
+                {app.email || app.user_id} - Status: <strong>{app.status}</strong>
+                <button onClick={() => handleProcessApproval(app.id, 'approved')} style={{ marginLeft: '0.5rem' }}>Approve</button>
+                <button onClick={() => handleProcessApproval(app.id, 'rejected')} style={{ marginLeft: '0.5rem' }}>Reject</button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
 }
-
-const inputStyle = { padding: '10px', borderRadius: '4px', border: '1px solid #ccc' };
-const btnStyle = { padding: '10px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' };
